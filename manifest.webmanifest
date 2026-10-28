@@ -1,0 +1,9 @@
+{
+  "name": "问易 · 一卦一镜",
+  "short_name": "问易",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f3ede1",
+  "theme_color": "#f3ede1",
+  "icons": [{ "src": "assets/icon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}

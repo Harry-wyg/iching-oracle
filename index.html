@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#f3ede1" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="description" content="问易 · 一卦一镜，照见当下。铜钱摇卦、梅花易数，生成专属运势卡片。" />
+  <title>问易 · 一卦一镜</title>
+  <link rel="icon" href="assets/icon.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="assets/icon.svg" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="preload" href="assets/fonts/brush.woff2" as="font" type="font/woff2" crossorigin />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body data-screen="home">
+  <!-- 毛笔质感滤镜 -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <filter id="brush" x="-5%" y="-30%" width="110%" height="160%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04 0.9" numOctaves="2" seed="3" result="n" />
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="5" xChannelSelector="R" yChannelSelector="G" />
+    </filter>
+    <filter id="rough"><feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="1" result="n" />
+      <feDisplacementMap in="SourceGraphic" in2="n" scale="2.5" /></filter>
+  </svg>
+
+  <canvas id="bg"></canvas>
+  <div class="paper"></div>
+
+  <header class="topbar">
+    <button class="brand" data-go="home" aria-label="首页">
+      <span class="seal-mini">易</span>
+      <span class="brand-txt"><b>问易</b> · 一卦一镜</span>
+    </button>
+    <nav class="steps" id="steps">
+      <span data-step="ask">问</span><i></i><span data-step="cast">卦</span><i></i><span data-step="result">解</span>
+    </nav>
+    <div class="tools">
+      <button class="icon-btn" id="btnAtlas" aria-label="卦象图鉴"><b>鉴</b><span>图鉴</span></button>
+      <button class="icon-btn" id="btnHistory" aria-label="推演记录"><b>录</b><span>记录</span></button>
+    </div>
+  </header>
+
+  <main>
+    <!-- ———————— 首页 ———————— -->
+    <section class="screen" id="home">
+      <div class="home">
+        <div class="hero">
+          <div class="hero-art">
+            <div class="ink-char">易</div>
+            <div class="vert">一卦一镜<br />照见当下</div>
+            <span class="hero-seal">问易</span>
+          </div>
+          <div class="hero-copy">
+            <p class="kicker" id="todayLunar">今日</p>
+            <h1>心有所惑，<br />不妨<em>问一卦</em>。</h1>
+            <p class="lead">三枚铜钱，六次起落，得一卦象。<br />它不预言命运，只帮你换个角度看清此刻。</p>
+            <div class="cta-row">
+              <button class="btn-red big" data-go="ask"><span>开始问卦</span></button>
+              <button class="btn-line" id="btnDailyTop">今日一卦</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="today" id="today">
+          <div class="today-card" id="todayCard">
+            <div class="tc-face tc-front">
+              <div class="tc-top"><span>今日签</span><em id="tcDate"></em></div>
+              <div class="tc-mid"><div class="tc-ring"><b>启</b></div><p>轻触翻开<br />今日专属一卦</p></div>
+              <div class="tc-bot">每人每日一签 · 次日更新</div>
+            </div>
+            <div class="tc-face tc-back" id="tcBack"></div>
+          </div>
+          <div class="today-side">
+            <h3>今日一卦</h3>
+            <p>无需提问，系统为你起一卦，作为今日的心境提示。<br />同一天内结果固定，明天再来看看有什么不同。</p>
+            <div class="today-actions" id="todayActions"></div>
+          </div>
+        </div>
+
+        <div class="block">
+          <div class="block-h"><span class="dot-red"></span>想问什么</div>
+          <div class="topics" id="topics"></div>
+        </div>
+
+        <div class="block">
+          <div class="block-h"><span class="dot-red"></span>三步问卦</div>
+          <div class="how">
+            <div><b>壹</b><h4>默念一事</h4><p>心中只想一件事，问得越具体越清晰</p></div>
+            <div><b>贰</b><h4>摇卦成象</h4><p>掷铜钱六次，或以时间、数字起卦</p></div>
+            <div><b>叁</b><h4>解卦出签</h4><p>白话解读、宜忌，一键生成运势卡片</p></div>
+          </div>
+        </div>
+        <footer class="foot">问易 · 以《周易》为镜的自我观照工具 · 内容仅供娱乐与参考，不构成任何决策建议</footer>
+      </div>
+    </section>
+
+    <!-- ———————— 问事 ———————— -->
+    <section class="screen" id="ask">
+      <div class="sheet ask">
+        <div class="sheet-h"><span class="no">壹</span><div><h2>所问何事</h2><p>静心片刻，在心里把问题说一遍</p></div></div>
+        <div class="field">
+          <textarea id="question" maxlength="60" rows="2" placeholder="写下你想问的事（也可以不写，只在心里默念）"></textarea>
+          <span class="count" id="qCount">0/60</span>
+        </div>
+        <div class="sugs" id="sugs"></div>
+        <div class="label">类别</div>
+        <div class="chips" id="cats"></div>
+        <div class="label">起卦方式</div>
+        <div class="methods" id="methods"></div>
+        <div class="sheet-foot">
+          <button class="btn-line" data-go="home">返回</button>
+          <button class="btn-red" id="toCast"><span>静心 · 起卦</span></button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ———————— 起卦 ———————— -->
+    <section class="screen" id="cast">
+      <div class="cast">
+        <div class="cast-stage">
+          <div class="q-echo" id="qEcho"></div>
+          <div class="builder" id="builder"></div>
+          <div class="tri-tags"><span id="triUp">上卦</span><span id="triLo">下卦</span></div>
+        </div>
+        <div class="sheet cast-panel" id="castPanel"></div>
+      </div>
+    </section>
+
+    <!-- ———————— 解卦 ———————— -->
+    <section class="screen" id="result"></section>
+  </main>
+
+  <!-- 揭晓动画 -->
+  <div class="reveal-layer" id="reveal"></div>
+
+  <!-- 运势卡片 -->
+  <div class="modal" id="cardModal">
+    <div class="modal-box card-box">
+      <div class="modal-h"><h3>我的运势卡片</h3><button class="x" data-close>✕</button></div>
+      <div class="card-body">
+        <div class="card-preview" id="cardPreview"><div class="card-loading">正在研墨……</div></div>
+        <div class="card-ctrl">
+          <div class="label">卡片风格</div>
+          <div class="themes" id="themes"></div>
+          <div class="label">署名（可选）</div>
+          <input id="cardName" maxlength="10" placeholder="例如：小满" />
+          <label class="check"><input type="checkbox" id="cardShowQ" checked /> 在卡片上显示我的问题</label>
+          <div class="card-btns">
+            <button class="btn-red" id="cardSave"><span>保存图片</span></button>
+            <button class="btn-line" id="cardShare">分享</button>
+          </div>
+          <p class="hint" id="cardHint">手机上也可以长按卡片图片保存</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 图鉴 -->
+  <div class="modal" id="atlas">
+    <div class="modal-box wide">
+      <div class="modal-h"><div><h3>六十四卦图鉴</h3><p>横为上卦，纵为下卦 · 点击查看</p></div><button class="x" data-close>✕</button></div>
+      <div class="atlas-grid" id="atlasGrid"></div>
+    </div>
+  </div>
+
+  <!-- 记录 -->
+  <div class="modal" id="history">
+    <div class="modal-box">
+      <div class="modal-h"><div><h3>问卦记录</h3><p>仅保存在本机</p></div><button class="x" data-close>✕</button></div>
+      <div id="historyList"></div>
+    </div>
+  </div>
+
+  <!-- 单卦详情 -->
+  <div class="modal" id="detail"><div class="modal-box" id="detailBody"></div></div>
+
+  <div class="toast" id="toast"></div>
+
+  <script src="data/hex-1.js"></script>
+  <script src="data/hex-2.js"></script>
+  <script src="data/hex-3.js"></script>
+  <script src="data/hex-4.js"></script>
+  <script src="js/core.js"></script>
+  <script src="js/bg.js"></script>
+  <script src="js/card.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
