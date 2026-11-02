@@ -104,14 +104,11 @@
     }
   }
 
-  async function render(d, themeKey) {
+  async function canvas(themeKey) {
     const T = THEMES[themeKey] || THEMES.paper;
     try { await Promise.all([document.fonts.load(`100px ${BRUSH}`), document.fonts.load(`40px ${KAI}`)]); } catch (e) {}
     const c = document.createElement("canvas"); c.width = W; c.height = H;
     const ctx = c.getContext("2d");
-    const { r, J, sc, lk } = d;
-    const P = r.primary, C = r.changed;
-
     // 底
     const g = ctx.createLinearGradient(0, 0, 0, H); g.addColorStop(0, T.bg[0]); g.addColorStop(1, T.bg[1]);
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
@@ -120,17 +117,35 @@
     // 边框
     ctx.strokeStyle = T.line; ctx.lineWidth = 2; ctx.strokeRect(40, 40, W - 80, H - 80);
     ctx.lineWidth = 1; ctx.strokeRect(54, 54, W - 108, H - 108);
+    return { c, ctx, T };
+  }
 
+  // 顶部：品牌印 + 日期 + 右上大印
+  function head(ctx, T, d, sealText, caption) {
     ctx.textBaseline = "alphabetic";
-    // 顶部：品牌印 + 日期
-    seal(ctx, 140, 150, 96, "问易", { accent: T.accent, sealText: T.sealText }, 0);
+    seal(ctx, 140, 150, 96, "问易", T, 0);
     ctx.textAlign = "left"; ctx.fillStyle = T.ink; ctx.font = `30px ${SANS}`;
     ctx.fillText(d.dateText, 214, 140);
     ctx.fillStyle = T.sub; ctx.font = `28px ${KAI}`; ctx.fillText(d.lunarText, 214, 182);
-    // 吉凶印
-    seal(ctx, W - 190, 170, 156, sc.level, { accent: T.accent, sealText: T.sealText }, -0.12);
+    seal(ctx, W - 190, 170, 156, sealText, T, -0.12);
     ctx.textAlign = "center"; ctx.fillStyle = T.accent; ctx.font = `28px ${SANS}`;
-    ctx.fillText(`运势指数 ${sc.pct}`, W - 190, 296);
+    ctx.fillText(caption, W - 190, 296);
+  }
+
+  function foot(ctx, T, d, tagline) {
+    const fy = H - 110;
+    ctx.textAlign = "left"; ctx.fillStyle = T.ink; ctx.font = `40px ${BRUSH}`;
+    ctx.fillText(tagline, 100, fy);
+    ctx.fillStyle = T.sub; ctx.font = `22px ${SANS}`;
+    ctx.fillText("问易 · 以《周易》为镜 · 仅供娱乐参考", 100, fy + 40);
+    if (d.name) { ctx.textAlign = "right"; ctx.fillStyle = T.ink; ctx.font = `36px ${KAI}`; ctx.fillText(`—— ${d.name} 记`, W - 100, fy + 10); }
+  }
+
+  async function render(d, themeKey) {
+    const { c, ctx, T } = await canvas(themeKey);
+    const { r, J, sc, lk } = d;
+    const P = r.primary, C = r.changed;
+    head(ctx, T, d, sc.level, `运势指数 ${sc.pct}`);
 
     let y = 360;
     ctx.textAlign = "center";
@@ -219,15 +234,51 @@
       } else ctx.fillText(v, cx, ly + 56);
     });
 
-    // 页脚
-    const fy = H - 110;
-    ctx.textAlign = "left"; ctx.fillStyle = T.ink; ctx.font = `40px ${BRUSH}`;
-    ctx.fillText("一卦一镜 · 照见当下", 100, fy);
-    ctx.fillStyle = T.sub; ctx.font = `22px ${SANS}`;
-    ctx.fillText("问易 · 以《周易》为镜 · 仅供娱乐参考", 100, fy + 40);
-    if (d.name) { ctx.textAlign = "right"; ctx.fillStyle = T.ink; ctx.font = `36px ${KAI}`; ctx.fillText(`—— ${d.name} 记`, W - 100, fy + 10); }
+    foot(ctx, T, d, "一卦一镜 · 照见当下");
     return c;
   }
 
-  window.CARD = { THEMES, render };
+  // 方位卡：九宫飞星（上南下北）+ 本命要点
+  async function renderFS(d, themeKey) {
+    const { c, ctx, T } = await canvas(themeKey);
+    const S = d.stars, ch = d.ch;
+    head(ctx, T, d, S[ch.center].n, ch.label);
+
+    ctx.textAlign = "center"; ctx.fillStyle = T.ink; ctx.font = `110px ${BRUSH}`;
+    ctx.fillText(d.title, W / 2, 420);
+    ctx.fillStyle = T.sub; ctx.font = `32px ${KAI}`; ctx.fillText(d.sub, W / 2, 478);
+
+    const gs = 220, gx = (W - gs * 3) / 2, gy = 530;
+    d.grid.forEach((p, i) => {
+      const x = gx + (i % 3) * gs, y = gy + Math.floor(i / 3) * gs, n = ch.map[p], pick = d.picks.includes(p);
+      if (pick) { ctx.fillStyle = T.accent; ctx.globalAlpha = 0.14; ctx.fillRect(x, y, gs, gs); ctx.globalAlpha = 1; }
+      ctx.strokeStyle = T.line; ctx.lineWidth = 2; ctx.strokeRect(x, y, gs, gs);
+      ctx.fillStyle = T.sub; ctx.font = `24px ${SANS}`; ctx.fillText(d.dirs[p], x + gs / 2, y + 42);
+      ctx.fillStyle = n === 5 || n === 9 ? T.accent : T.ink; ctx.font = `72px ${BRUSH}`;
+      ctx.fillText(S[n].n, x + gs / 2, y + 128);
+      ctx.fillStyle = pick ? T.accent : T.sub; ctx.font = `28px ${KAI}`;
+      ctx.fillText(d.tags[p] || S[n].k, x + gs / 2, y + 180);
+    });
+    d.picks.forEach((p) => {
+      const i = d.grid.indexOf(p), x = gx + (i % 3) * gs, y = gy + Math.floor(i / 3) * gs;
+      ctx.strokeStyle = T.accent; ctx.lineWidth = 5; ctx.strokeRect(x + 6, y + 6, gs - 12, gs - 12);
+    });
+    ctx.strokeStyle = T.ink; ctx.lineWidth = 3; ctx.strokeRect(gx, gy, gs * 3, gs * 3);
+    ctx.fillStyle = T.sub; ctx.font = `24px ${SANS}`;
+    ctx.fillText("上南下北 · 左东右西", W / 2, gy + gs * 3 + 46);
+
+    let y = gy + gs * 3 + 126;
+    ctx.fillStyle = T.ink; ctx.font = `52px ${BRUSH}`; ctx.fillText(d.headline, W / 2, y);
+    y += 62;
+    ctx.font = `31px ${KAI}`;
+    d.lines.slice(0, 3).forEach((l, i) => {
+      ctx.fillStyle = i === 2 && d.lastMuted ? T.sub : T.ink;
+      ctx.fillText(wrap(ctx, l, 880, 1)[0], W / 2, y + i * 50);
+    });
+
+    foot(ctx, T, d, "八卦定方位 · 九星照流年");
+    return c;
+  }
+
+  window.CARD = { THEMES, render, renderFS };
 })();

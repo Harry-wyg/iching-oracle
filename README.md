@@ -22,6 +22,13 @@ For local preview, serve it over HTTP: `python3 -m http.server 8765`, then open 
 - **揭晓**: full-screen ink burst, the hexagram name, and a seal stamp showing 吉 / 凶
 - **解卦**: fortune score and trend, core verdict (Zhu Xi's changing-line rules), 宜 / 忌, lucky colour / numbers / direction, per-category fortune, plain-language reading, the 互 / 错 / 综 hexagrams, line-by-line explanation
 - **运势卡片**: a 1080×1680 shareable poster drawn on canvas. Three templates (宣纸 / 墨夜 / 朱砂), an optional signature, and an option to hide the question. Supports save, system share, and long-press save inside WeChat
+- **方位 · 风水**:
+  - 本命卦（八宅）: birth date + gender → 命卦, 东/西四命, the 8 directions (生气、天医、延年、伏位 / 祸害、六煞、五鬼、绝命); the year boundary is 立春
+  - 手机罗盘: a 24-mountain dial driven by the device compass (iOS asks for permission; on PC the dial can be dragged). Rings: 二十四山 / 八卦 / 本命八宅 / 今日飞星. 寻方 mode gives turn-by-turn guidance and vibrates when you face the target
+  - 九宫飞星: 紫白 stars for the day / month / current year / next year, the key positions (文昌、正财、旺气、桃花、五黄、病符), and the best and worst directions computed from the user's 命卦
+  - Hexagram link-up: the 吉方位 on the reading opens the compass; the reading says whether that direction matches the user's 命卦
+  - 方位卡片: a 九宫 poster that reuses the three card themes
+  - Home: a 方位 entry block, plus a next-year 流年 banner from October onward
 - **图鉴 / 记录**: 8×8 hexagram grid with detail views; history stored locally
 
 ## 结构
@@ -29,6 +36,7 @@ For local preview, serve it over HTTP: `python3 -m http.server 8765`, then open 
 ```
 index.html               页面骨架（含毛笔质感 SVG 滤镜）
 css/style.css            主题与响应式（移动优先，≥760px 切换 PC 布局）
+js/fengshui.js           风水推演：节气（寿星通式）、八宅命卦、紫白年/月/日飞星、罗盘方位
 js/core.js               卦象推演：文王卦序、起卦、变/互/错/综、断卦、评分、宜忌幸运、每日一卦
 js/bg.js                 Canvas 水墨背景（远山、流云、朱砂日、落墨涟漪）
 js/card.js               运势卡片绘制
@@ -43,3 +51,4 @@ assets/icon.svg          图标 / manifest.webmanifest  PWA 配置
 - 卦辞、爻辞经程序校验过结构与阴阳，仍建议对照通行本《周易》人工校对一遍
 - The 宜 / 忌 and lucky items are interpretive content derived from the 五行 (five phases) and directions. They are labelled "仅供娱乐参考" (for entertainment only), and that label should stay for compliance
 - To spread it in WeChat, add the JS-SDK custom share card (needs an Official Account and a backend signature)
+- 风水算法已对照常见命卦表和 2024–2027 年星核对；日家紫白各派起法略有差异，上线前建议找懂行的人抽查几天

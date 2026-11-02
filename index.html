@@ -37,6 +37,7 @@
       <span data-step="ask">问</span><i></i><span data-step="cast">卦</span><i></i><span data-step="result">解</span>
     </nav>
     <div class="tools">
+      <button class="icon-btn" data-fs="cmp" aria-label="罗盘方位"><b>盘</b><span>罗盘</span></button>
       <button class="icon-btn" id="btnAtlas" aria-label="卦象图鉴"><b>鉴</b><span>图鉴</span></button>
       <button class="icon-btn" id="btnHistory" aria-label="推演记录"><b>录</b><span>记录</span></button>
     </div>
@@ -77,6 +78,11 @@
             <p>无需提问，系统为你起一卦，作为今日的心境提示。<br />同一天内结果固定，明天再来看看有什么不同。</p>
             <div class="today-actions" id="todayActions"></div>
           </div>
+        </div>
+
+        <div class="block">
+          <div class="block-h"><span class="dot-red"></span>方位 · 风水<small>后天八卦定八方，风水之本</small></div>
+          <div class="fs-home" id="fsHome"></div>
         </div>
 
         <div class="block">
@@ -130,6 +136,28 @@
 
     <!-- ———————— 解卦 ———————— -->
     <section class="screen" id="result"></section>
+
+    <!-- ———————— 方位 · 风水 ———————— -->
+    <section class="screen" id="fs">
+      <div class="fs">
+        <div class="sheet fs-cmp" id="fsCmp">
+          <div class="sheet-h"><span class="no">盘</span><div><h2>罗盘寻方</h2><p id="cmpTip">手机平放，顶端所指即为朝向</p></div></div>
+          <div class="cmp" id="cmp">
+            <div class="cmp-dial" id="cmpDial"></div>
+            <div class="cmp-cross"></div>
+            <div class="cmp-pointer"></div>
+          </div>
+          <div class="cmp-read" id="cmpRead"></div>
+          <div class="cmp-targets" id="cmpTargets"></div>
+          <div class="row-c" id="cmpStartRow"><button class="btn-red" id="cmpStart"><span>开启罗盘</span></button></div>
+        </div>
+        <div class="fs-side">
+          <div class="box" id="mingBox"></div>
+          <div class="box" id="starBox"></div>
+          <p class="disclaimer">方位内容依传统八宅法与紫白飞星推演，节气按通式推算（个别年份可能差一日）；<br/>属传统文化娱乐参考，不构成任何装修、置业或投资建议。</p>
+        </div>
+      </div>
+    </section>
   </main>
 
   <!-- 揭晓动画 -->
@@ -138,7 +166,7 @@
   <!-- 运势卡片 -->
   <div class="modal" id="cardModal">
     <div class="modal-box card-box">
-      <div class="modal-h"><h3>我的运势卡片</h3><button class="x" data-close>✕</button></div>
+      <div class="modal-h"><h3 id="cardTitle">我的运势卡片</h3><button class="x" data-close>✕</button></div>
       <div class="card-body">
         <div class="card-preview" id="cardPreview"><div class="card-loading">正在研墨……</div></div>
         <div class="card-ctrl">
@@ -146,7 +174,7 @@
           <div class="themes" id="themes"></div>
           <div class="label">署名（可选）</div>
           <input id="cardName" maxlength="10" placeholder="例如：小满" />
-          <label class="check"><input type="checkbox" id="cardShowQ" checked /> 在卡片上显示我的问题</label>
+          <label class="check" id="cardShowQRow"><input type="checkbox" id="cardShowQ" checked /> 在卡片上显示我的问题</label>
           <div class="card-btns">
             <button class="btn-red" id="cardSave"><span>保存图片</span></button>
             <button class="btn-line" id="cardShare">分享</button>
@@ -183,6 +211,7 @@
   <script src="data/hex-3.js"></script>
   <script src="data/hex-4.js"></script>
   <script src="js/core.js"></script>
+  <script src="js/fengshui.js"></script>
   <script src="js/bg.js"></script>
   <script src="js/card.js"></script>
   <script src="js/app.js"></script>

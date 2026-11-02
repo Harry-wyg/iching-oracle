@@ -67,9 +67,11 @@
       s.classList.toggle("on", i === cur); s.classList.toggle("done", cur > i);
     });
     $("#" + screen).scrollTop = 0;
+    if (screen === "fs" && !CMP.raf) CMP.raf = requestAnimationFrame(dialLoop);
   }
   document.addEventListener("click", (e) => {
     const g = e.target.closest("[data-go]"); if (g) go(g.dataset.go);
+    const f = e.target.closest("[data-fs]"); if (f) { $$(".modal.open").forEach((o) => o.classList.remove("open")); openFs(f.dataset.fs); }
     const c = e.target.closest("[data-close]"); if (c) c.closest(".modal").classList.remove("open");
     if (e.target.classList.contains("modal")) e.target.classList.remove("open");
   });
@@ -86,6 +88,7 @@
     $("#topics").innerHTML = CATS.map((c) => `<button class="topic" data-topic="${c.k}"><b>${c.i}</b><span>${c.n}</span><small>${c.d}</small></button>`).join("");
     $("#todayActions").innerHTML = `<button class="btn-red" id="flipToday"><span>翻开今日签</span></button>`;
     $("#flipToday").onclick = flipToday;
+    renderFsHome();
   }
   $("#topics").addEventListener("click", (e) => {
     const b = e.target.closest("[data-topic]"); if (!b) return;
@@ -106,9 +109,12 @@
     card.classList.add("flipped");
     buzz(15);
     const rect = card.getBoundingClientRect(); BG.pulse(rect.left + rect.width / 2, rect.top + rect.height / 2, true);
-    $("#todayActions").innerHTML = `<button class="btn-red" id="dailyDetail"><span>查看详解</span></button><button class="btn-line" id="dailyCard">生成今日卡片</button>`;
+    const dir = Y.lucky(r).direction;
+    $("#todayActions").innerHTML = `<button class="btn-red" id="dailyDetail"><span>查看详解</span></button><button class="btn-line" id="dailyCard">生成今日卡片</button>
+      <button class="btn-line" id="dailyDir">今日吉方 · ${dir}</button>`;
     $("#dailyDetail").onclick = () => openDaily(false);
     $("#dailyCard").onclick = () => openDaily(true);
+    $("#dailyDir").onclick = () => openFs("cmp", { label: "今日卦吉方", dir, angle: FS.angleOfDir(dir) });
   }
   function openDaily(card) {
     Object.assign(S, { question: "", cat: "overall", method: "daily", values: Y.dailyValues(userSeed), daily: true, time: Date.now() });
@@ -335,6 +341,9 @@
     const f0 = J.focus[0], f1 = J.focus[1];
     const title = S.daily ? "今日一卦" : S.question || "心中默念之事";
     const src = (f) => `${esc(nm(f.hex))}卦 · ${f.kind || Y.POS[f.line] + "爻"}`;
+    const ming = mingOf(), yn = ming && FS.bazhai(ming.tri).find((x) => x.dir === lk.direction);
+    const dirHint = !ming ? `<button class="link" data-fs="ming">设置本命卦</button>，看卦象吉方是否与你本命相合`
+      : `此方恰是你本命（${ming.tri}命）的<b>${yn.k}位</b>，${yn.good ? "卦象与本命相合，可多朝此方行事、落座。" : "属本命凶方，宜以本命吉方为主，卦象吉方为辅。"}`;
 
     $("#result").innerHTML = `
     <div class="res">
@@ -378,8 +387,9 @@
           <div class="luck3">
             <div><label>幸运色</label><b><i style="background:${lk.color.hex}"></i>${lk.color.name}</b></div>
             <div><label>幸运数字</label><b>${lk.numbers.join(" · ")}</b></div>
-            <div><label>吉方位</label><b>${lk.direction}</b></div>
+            <button class="lk-dir" data-dir="${lk.direction}"><label>吉方位</label><b>${lk.direction}</b><small>罗盘寻方 ›</small></button>
           </div>
+          <p class="fs-hint">${dirHint}</p>
         </div>
 
         <div class="box fade-in" style="--d:.24s">
@@ -422,6 +432,7 @@
     setF(focusCat);
     $("#ftabs").onclick = (e) => { const b = e.target.closest("[data-fc]"); if (b) setF(b.dataset.fc); };
     $$("#result .mini").forEach((b) => (b.onclick = () => openDetail(+b.dataset.hex)));
+    $("#result .lk-dir").onclick = () => openFs("cmp", { label: "本卦吉方", dir: lk.direction, angle: FS.angleOfDir(lk.direction) });
     const num = $("#result [data-count]"), target = +num.dataset.count, t0 = performance.now();
     (function step(now) { const p = Math.min(1, (now - t0) / 1300); num.textContent = Math.round(target * (1 - Math.pow(1 - p, 3))); if (p < 1) requestAnimationFrame(step); })(t0);
   }
@@ -439,7 +450,7 @@
   });
 
   // ———————————————— 运势卡片 ————————————————
-  let cardTheme = store.get("wy-card-theme", "paper"), cardURL = null, cardBlob = null, drawSeq = 0;
+  let cardTheme = store.get("wy-card-theme", "paper"), cardURL = null, cardBlob = null, drawSeq = 0, cardFs = null;
   function cardData() {
     const r = S.result, J = Y.judge(r), sc = Y.score(r, S.cat), d = new Date(S.time);
     const f = J.focus[0];
@@ -455,7 +466,7 @@
   async function drawCard() {
     const seq = ++drawSeq;
     $("#cardPreview").innerHTML = `<div class="card-loading">正在研墨……</div>`;
-    const c = await CARD.render(cardData(), cardTheme);
+    const c = cardFs ? await CARD.renderFS(fsCardData(cardFs), cardTheme) : await CARD.render(cardData(), cardTheme);
     const blob = await new Promise((res) => c.toBlob(res, "image/png"));
     if (seq !== drawSeq) return;
     cardBlob = blob;
@@ -463,8 +474,12 @@
     cardURL = URL.createObjectURL(blob);
     $("#cardPreview").innerHTML = `<img src="${cardURL}" alt="运势卡片" />`;
   }
-  function openCard() {
-    if (!S.result) return;
+  // fs: 方位卡所用的盘（{ tab, ch }），缺省为运势卡
+  function openCard(fs) {
+    cardFs = fs && fs.ch ? fs : null;
+    if (!cardFs && !S.result) return;
+    $("#cardTitle").textContent = cardFs ? "我的方位卡片" : "我的运势卡片";
+    $("#cardShowQRow").style.display = cardFs ? "none" : "";
     $("#cardName").value = store.get("wy-name", "");
     $("#themes").innerHTML = Object.entries(CARD.THEMES).map(([k, t]) => `<button class="theme ${k === cardTheme ? "on" : ""}" data-theme="${k}"><i style="background:linear-gradient(${t.bg[0]},${t.bg[1]})"></i>${t.name}</button>`).join("");
     $("#cardModal").classList.add("open");
@@ -478,7 +493,7 @@
   let nameT;
   $("#cardName").addEventListener("input", (e) => { store.set("wy-name", e.target.value.trim()); clearTimeout(nameT); nameT = setTimeout(drawCard, 450); });
   $("#cardShowQ").addEventListener("change", drawCard);
-  const fileName = () => `问易-${nm(S.result.primary)}-${dateText(new Date(S.time))}.png`;
+  const fileName = () => (cardFs ? `问易-${fsTitle(cardFs).title}-${dateText()}.png` : `问易-${nm(S.result.primary)}-${dateText(new Date(S.time))}.png`);
   $("#cardSave").onclick = () => {
     if (!cardURL) return;
     if (/MicroMessenger/i.test(navigator.userAgent)) { toast("请长按上方图片保存"); return; }
@@ -492,8 +507,15 @@
       try { await navigator.share({ files: [file], title: "我的运势卡片", text: "问易 · 一卦一镜，照见当下" }); } catch (e) {}
       return;
     }
-    const r = S.result, sc = Y.score(r, S.cat);
-    const txt = `我在「问易」问了一卦：${r.primary.full}${r.changed ? ` → ${r.changed.full}` : ""}，${sc.level}（${sc.pct}）。${location.protocol.startsWith("http") ? location.href : ""}`;
+    const link = location.protocol.startsWith("http") ? location.href.split("#")[0] : "";
+    let txt;
+    if (cardFs) {
+      const k = FS.keys(cardFs.ch), at = (s) => FS.DIR[k.find((x) => x.s === s).p];
+      txt = `我在「问易」看了${fsTitle(cardFs).title}：${cardFs.ch.label}，文昌在${at(4)}，正财在${at(8)}。${link}`;
+    } else {
+      const r = S.result, sc = Y.score(r, S.cat);
+      txt = `我在「问易」问了一卦：${r.primary.full}${r.changed ? ` → ${r.changed.full}` : ""}，${sc.level}（${sc.pct}）。${link}`;
+    }
     try { await navigator.clipboard.writeText(txt); toast("分享文案已复制"); } catch (e) { toast("请长按图片保存后分享"); }
   };
 
@@ -558,6 +580,284 @@
     $("#history").classList.remove("open");
     showResult(store.get(HKEY, [])[+b.dataset.k]);
   });
+
+  // ———————————————— 方位 · 风水 ————————————————
+  const MKEY = "wy-ming";
+  const mingOf = () => { const m = store.get(MKEY, null); return m && FS.mingGua(m.birth, m.g); };
+  const starCls = (n) => ({ 吉: "s-good", 大吉: "s-great", 凶: "s-bad", 大凶: "s-worst" }[FS.STARS[n].t]);
+
+  // 九宫盘：今日 / 本月 / 当年流年 / 次年流年
+  function fsCharts(d = new Date()) {
+    const sy = FS.solarYear(d);
+    return {
+      day: { n: "今日", ch: FS.dayChart(d) },
+      month: { n: "本月", ch: FS.monthChart(d) },
+      y0: { n: `${sy}流年`, ch: FS.yearChart(sy) },
+      y1: { n: `${sy + 1}流年`, ch: FS.yearChart(sy + 1), tag: "新" },
+    };
+  }
+  // 首页横幅：十月起主推次年流年
+  function bannerTab(d = new Date()) { return d.getMonth() >= 9 || FS.solarYear(d) < d.getFullYear() ? "y1" : "y0"; }
+  function fsTitle(fs) {
+    const ch = fs.ch;
+    if (ch.kind === "year") return { title: `${Y.ganzhi(ch.y)}流年`, sub: `${ch.y} · ${ch.label} · 九宫飞星` };
+    if (ch.kind === "month") return { title: "本月方位", sub: `${ch.title} · ${ch.label}` };
+    return { title: "今日方位", sub: `${ch.title} · ${ch.label}` };
+  }
+
+  function renderFsHome() {
+    const m = mingOf(), day = FS.dayChart(new Date()), tab = bannerTab(), yc = fsCharts()[tab].ch;
+    const at = (ch, s) => FS.DIR_SHORT[FS.palaceOf(ch, s)];
+    const mini = FS.GRID.map((p) => `<i class="${starCls(day.map[p])}">${day.map[p]}</i>`).join("");
+    const good = m && FS.bazhai(m.tri).filter((x) => x.good && x.k !== "伏位");
+    $("#fsHome").innerHTML = `
+      <div class="fh-row">
+        <button class="fh-card" data-fs="ming">${m
+          ? `<span class="fh-sym">${Y.TRIGRAMS[m.tri].sym}</span><b>${m.tri}命 · ${m.group}</b><small>${good.map((x) => `${x.k} ${x.dir}`).join(" · ")}</small>`
+          : `<span class="fh-sym txt">命</span><b>测我的本命卦</b><small>八宅命卦 · 找到你的四个吉方</small>`}</button>
+        <button class="fh-card" data-fs="star"><span class="fh-grid">${mini}</span><b>今日九宫</b><small>九紫在${at(day, 9)} · 五黄在${at(day, 5)}</small></button>
+        <button class="fh-card" data-fs="cmp"><span class="fh-cmp"><i></i></span><b>手机罗盘</b><small>二十四山 · 一转寻吉方</small></button>
+      </div>
+      <button class="fh-year" data-fs="${tab}">
+        <span class="fy-n">${yc.y}</span>
+        <div><b>${Y.ganzhi(yc.y)}流年 · ${yc.label}</b><small>文昌在${at(yc, 4)}、正财在${at(yc, 8)}、五黄在${at(yc, 5)} · ${m ? "看你的专属流年方位" : "测测你的流年方位"}</small></div>
+        <em>查看</em>
+      </button>`;
+  }
+
+  // sec: cmp / ming / star / day / month / y0 / y1；target: { label, dir, angle }
+  let fsTab = "day", mingEdit = false;
+  function openFs(sec, target) {
+    if (target) { CMP.extra = target; CMP.target = target; }
+    if (["day", "month", "y0", "y1"].includes(sec)) fsTab = sec;
+    if (sec === "ming" && !mingOf()) mingEdit = true;
+    renderFs(); go("fs");
+    const el = { cmp: "#fsCmp", ming: "#mingBox" }[sec] || (sec ? "#starBox" : null);
+    if (el && !(sec === "cmp" && matchMedia("(min-width: 760px)").matches)) setTimeout(() => $(el).scrollIntoView({ behavior: "smooth", block: "start" }), 380);
+  }
+  function renderFs() { buildDial(); renderTargets(); renderMing(); renderStars(); CMP.dirty = true; }
+
+  // —— 本命卦 ——
+  function renderMing() {
+    const m = mingOf(), saved = store.get(MKEY, { birth: "1995-06-01", g: "m" });
+    if (!m || mingEdit) {
+      $("#mingBox").innerHTML = `
+        <div class="box-h"><b>命</b>本命卦<small>八宅法 · 以立春为年界</small></div>
+        <div class="ming-form">
+          <label><em>出生日期（公历）</em><input type="date" id="mBirth" value="${esc(saved.birth)}" min="1901-01-01" max="2099-12-31" /></label>
+          <div class="seg" id="mG"><button data-g="m" class="${saved.g === "m" ? "on" : ""}">男 · 乾造</button><button data-g="f" class="${saved.g === "f" ? "on" : ""}">女 · 坤造</button></div>
+          <button class="btn-red" id="mGo"><span>推算本命卦</span></button>
+        </div>
+        <p class="tip">八宅法以出生年推命卦，男女同年命卦不同；立春前出生按上一年计。日期只用来判断立春前后，仅保存在本机。</p>`;
+      $("#mG").onclick = (e) => { const b = e.target.closest("[data-g]"); if (b) $$("#mG button").forEach((x) => x.classList.toggle("on", x === b)); };
+      $("#mGo").onclick = () => {
+        const birth = $("#mBirth").value, g = $("#mG .on") ? $("#mG .on").dataset.g : "m";
+        if (!FS.mingGua(birth, g)) { toast("请填写 1901–2099 年间的出生日期"); return; }
+        store.set(MKEY, { birth, g }); mingEdit = false;
+        renderFs(); renderFsHome(); buzz([20, 40, 20]);
+        const r = $("#mingBox").getBoundingClientRect(); BG.pulse(r.left + 60, r.top + 80, true);
+      };
+      return;
+    }
+    $("#mingBox").innerHTML = `
+      <div class="box-h"><b>命</b>本命卦<small><button class="link" id="mEdit">修改</button></small></div>
+      <div class="ming-res">
+        <div class="ming-sym">${Y.TRIGRAMS[m.tri].sym}</div>
+        <div><div class="nm">${m.tri}命</div><p>${m.group} · ${m.sy} ${m.gz}年 · ${m.g === "f" ? "坤造" : "乾造"}</p></div>
+        <span class="seal">${Y.TRIGRAMS[m.tri].nature}</span>
+      </div>
+      <div class="yn-grid">${FS.bazhai(m.tri).map((x) => `<div class="yn ${x.good ? "good" : ""}"><b>${x.k}</b><span>${x.dir}</span><small>${x.d}</small></div>`).join("")}</div>`;
+    $("#mEdit").onclick = () => { mingEdit = true; renderMing(); };
+  }
+
+  // —— 九宫飞星 ——
+  function renderStars() {
+    const C = fsCharts(), cur = C[fsTab], ch = cur.ch, m = mingOf();
+    const yn = m ? Object.fromEntries(FS.bazhai(m.tri).map((x) => [x.tri, x])) : {};
+    const per = m && FS.personal(ch, m), picks = per ? per.best.map((x) => x.tri) : [];
+    const cells = FS.GRID.map((p) => {
+      const n = ch.map[p], st = FS.STARS[n], y = yn[p];
+      return `<div class="gc ${starCls(n)} ${picks.includes(p) ? "pick" : ""} ${p === "中" ? "mid" : ""}">
+        <small>${FS.DIR_SHORT[p]}</small><b>${st.n}</b><em>${st.k}</em>${y ? `<i class="${y.good ? "good" : ""}">${y.k}</i>` : ""}</div>`;
+    }).join("");
+    const keys = FS.keys(ch).map((k) => `<div class="${k.s === 5 || k.s === 2 ? "warn" : ""}"><label>${k.k}</label><b>${FS.DIR[k.p]}</b><p>${k.tip}</p></div>`).join("");
+    const mine = per ? `
+      <div class="mine">
+        <h4>与你本命相合 <small>${m.tri}命 · ${m.group}</small></h4>
+        ${per.best.map((x, i) => `<div class="pk"><span class="seal">${i ? "次" : "宜"}</span><div><b>${x.dir}</b><p>${x.text}</p></div></div>`).join("")}
+        <div class="pk avoid"><span class="seal">静</span><div><b>${per.worst.dir}</b><p>${per.worst.text}</p></div></div>
+      </div>`
+      : `<div class="mine empty-mine"><p>设置本命卦后，九宫会标出你的八宅吉凶，并给出首选方位。</p><button class="btn-line" data-fs="ming">测我的本命卦</button></div>`;
+    const t = fsTitle(cur);
+    $("#starBox").innerHTML = `
+      <div class="box-h"><b>星</b>九宫飞星<small>紫白九星 · 上南下北</small></div>
+      <div class="tabs" id="starTabs">${Object.entries(C).map(([k, v]) => `<button class="tab ${k === fsTab ? "on" : ""}" data-tab="${k}">${v.n}${v.tag ? `<i>${v.tag}</i>` : ""}</button>`).join("")}</div>
+      <div class="star-head"><b>${t.title}</b><span>${t.sub}</span></div>
+      <div class="grid9">${cells}</div>
+      <div class="keys">${keys}</div>
+      ${mine}
+      <div class="star-btns">
+        <button class="btn-red" id="starCard"><span>生成方位卡片</span></button>
+        <button class="btn-line" data-fs="cmp">罗盘寻方</button>
+      </div>`;
+    $("#starTabs").onclick = (e) => { const b = e.target.closest("[data-tab]"); if (b) { fsTab = b.dataset.tab; renderStars(); } };
+    $("#starCard").onclick = () => openCard({ tab: fsTab, ch });
+  }
+
+  function fsCardData(fs) {
+    const ch = fs.ch, m = mingOf(), now = new Date(), t = fsTitle(fs);
+    const yn = m ? Object.fromEntries(FS.bazhai(m.tri).map((x) => [x.tri, x.k])) : {};
+    const per = m && FS.personal(ch, m), K = FS.keys(ch), at = (s) => FS.DIR_SHORT[K.find((x) => x.s === s).p];
+    const tags = Object.fromEntries(FS.GRID.map((p) => [p, yn[p] ? `${yn[p]} · ${FS.STARS[ch.map[p]].k}` : FS.STARS[ch.map[p]].k]));
+    return {
+      ch, stars: FS.STARS, grid: FS.GRID, dirs: FS.DIR_SHORT, tags, title: t.title, sub: t.sub,
+      picks: per ? per.best.map((x) => x.tri) : [FS.palaceOf(ch, 4), FS.palaceOf(ch, 8)].filter((p) => p !== "中"),
+      headline: m ? `${m.tri}命 · ${m.group}` : "九宫要位",
+      lines: per
+        ? [`宜 · ${per.best[0].dir} · ${per.best[0].head}`, `次 · ${per.best[1].dir} · ${per.best[1].head}`, `静 · ${per.worst.dir} · ${per.worst.head}`]
+        : [`文昌 ${at(4)} · 正财 ${at(8)} · 桃花 ${at(1)}`, `旺气 ${at(9)} · 贵人 ${at(6)}`, `五黄 ${at(5)} · 病符 ${at(2)} · 宜静不宜动`],
+      lastMuted: true,
+      name: $("#cardName").value.trim(), dateText: dateText(now), lunarText: lunarText(now),
+    };
+  }
+
+  // —— 罗盘 ——
+  const CMP = { h: 0, shown: 0, sensor: false, listening: false, target: null, extra: null, hit: false, raf: 0, lastDeg: -1, dirty: true, day: null, yn: null };
+  const n180 = (a) => ((((a + 180) % 360) + 360) % 360) - 180;
+  const pt = (r, a) => [+(r * Math.sin((a * Math.PI) / 180)).toFixed(2), +(-r * Math.cos((a * Math.PI) / 180)).toFixed(2)];
+  function sector(r1, r2, a0, a1) {
+    const [x1, y1] = pt(r2, a0), [x2, y2] = pt(r2, a1), [x3, y3] = pt(r1, a1), [x4, y4] = pt(r1, a0);
+    return `M${x1} ${y1}A${r2} ${r2} 0 0 1 ${x2} ${y2}L${x3} ${y3}A${r1} ${r1} 0 0 0 ${x4} ${y4}Z`;
+  }
+  const lbl = (a, r, txt, cls = "") => `<text class="${cls}" transform="rotate(${a}) translate(0 ${-r})">${txt}</text>`;
+
+  // 由外向内：二十四山 · 八卦 · 本命八宅 · 今日飞星 · 天池
+  function buildDial() {
+    const m = mingOf();
+    CMP.day = FS.dayChart(new Date());
+    CMP.yn = m ? Object.fromEntries(FS.bazhai(m.tri).map((x) => [x.tri, x])) : null;
+    let s = `<svg viewBox="-216 -216 432 432" aria-hidden="true">
+      <circle r="200" class="d-bg"/>`;
+    [...FS.MOUNTAINS].forEach((mt, i) => {
+      const a = i * 15;
+      s += `<path d="${sector(174, 200, a - 7.5, a + 7.5)}" class="d-cell"/>` + lbl(a, 187, mt, i % 6 === 0 ? "d-mt red" : "d-mt");
+    });
+    FS.TRIS.forEach((t) => {
+      const a = FS.TRI_ANGLE[t], y = CMP.yn && CMP.yn[t], n = CMP.day.map[t];
+      s += `<path d="${sector(130, 174, a - 22.5, a + 22.5)}" class="d-cell"/>`
+        + lbl(a, 160, Y.TRIGRAMS[t].sym, "d-sym") + lbl(a, 140, `${t} · ${FS.DIR_SHORT[t]}`, "d-tri")
+        + `<path d="${sector(94, 130, a - 22.5, a + 22.5)}" class="d-cell ${y ? (y.good ? "good" : "bad") : ""}"/>`
+        + lbl(a, 112, y ? y.k : "洛书" + FS.TRI_NUM[t], y && y.good ? "d-yn good" : "d-yn")
+        + `<path d="${sector(64, 94, a - 22.5, a + 22.5)}" class="d-cell"/>`
+        + lbl(a, 79, FS.STARS[n].n, `d-st ${starCls(n)}`);
+    });
+    s += `<circle r="64" class="d-core"/><circle r="44" class="d-pool"/>
+      <path d="M0 -40 L6 0 L-6 0Z" class="d-needle-n"/><path d="M0 40 L6 0 L-6 0Z" class="d-needle-s"/><circle r="4" class="d-pin"/>
+      <g id="dTarget" class="d-target" style="display:none"><path d="M0 -201 L-10 -215 L10 -215Z"/></g>
+    </svg>`;
+    $("#cmpDial").innerHTML = s;
+    setTargetMark();
+    const coarse = matchMedia("(pointer: coarse)").matches && "DeviceOrientationEvent" in window;
+    $("#cmpStartRow").style.display = coarse && !CMP.sensor ? "" : "none";
+    $("#cmpTip").textContent = CMP.sensor ? "手机平放，顶端所指即为朝向" : coarse ? "开启罗盘后平放手机；也可拖动盘面旋转" : "电脑没有指南针，拖动盘面即可旋转查看";
+  }
+  function setTargetMark() {
+    const g = $("#dTarget"); if (!g) return;
+    g.style.display = CMP.target ? "" : "none";
+    if (CMP.target) g.setAttribute("transform", `rotate(${CMP.target.angle})`);
+  }
+
+  function targetList() {
+    const list = [], add = (t) => { if (t.dir && !list.some((x) => x.label === t.label)) list.push(t); };
+    const dirT = (label, p) => p && p !== "中" && add({ label, dir: FS.DIR[p], angle: FS.TRI_ANGLE[p] });
+    if (CMP.extra) add(CMP.extra);
+    const dl = Y.lucky(Y.analyze(Y.dailyValues(userSeed))).direction;
+    add({ label: "今日卦吉方", dir: dl, angle: FS.angleOfDir(dl) });
+    const m = mingOf();
+    if (m) FS.bazhai(m.tri).filter((x) => x.good && x.k !== "伏位").forEach((x) => add({ label: `本命${x.k}`, dir: x.dir, angle: x.angle }));
+    const yc = FS.yearChart(FS.solarYear(new Date()));
+    dirT("今日九紫", FS.palaceOf(CMP.day, 9));
+    dirT("流年文昌", FS.palaceOf(yc, 4));
+    dirT("流年正财", FS.palaceOf(yc, 8));
+    return list;
+  }
+  function renderTargets() {
+    const list = targetList();
+    $("#cmpTargets").innerHTML = `<label>寻方</label>` + list.map((t, i) => `<button class="tgt ${CMP.target && CMP.target.label === t.label ? "on" : ""}" data-i="${i}">${t.label}<small>${t.dir}</small></button>`).join("");
+    $("#cmpTargets").onclick = (e) => {
+      const b = e.target.closest("[data-i]"); if (!b) return;
+      const t = list[+b.dataset.i];
+      CMP.target = CMP.target && CMP.target.label === t.label ? null : t; CMP.hit = false; CMP.dirty = true;
+      $$("#cmpTargets .tgt").forEach((x) => x.classList.toggle("on", CMP.target && x === b));
+      setTargetMark();
+    };
+  }
+
+  function updateRead() {
+    const a = FS.norm(CMP.shown), tri = FS.triAt(a), y = CMP.yn && CMP.yn[tri], st = FS.STARS[CMP.day.map[tri]];
+    let guide = "";
+    if (CMP.target) {
+      const d = n180(CMP.target.angle - a), ok = Math.abs(d) < 8;
+      if (ok && !CMP.hit) {
+        CMP.hit = true; buzz([20, 40, 20]);
+        const r = $("#cmp").getBoundingClientRect(); BG.pulse(r.left + r.width / 2, r.top + r.height / 2, true);
+      } else if (Math.abs(d) > 12) CMP.hit = false;
+      guide = `<div class="cr-guide ${ok ? "hit" : ""}">${ok ? `已朝向 ${CMP.target.label} · ${CMP.target.dir}` : `${CMP.target.label}（${CMP.target.dir}）：向${d > 0 ? "右" : "左"}转 ${Math.round(Math.abs(d))}°`}</div>`;
+    }
+    $("#cmp").classList.toggle("hit", !!(CMP.target && CMP.hit));
+    $("#cmpRead").innerHTML = `
+      <div class="cr-main"><b>${Math.round(a) % 360}°</b><span>${FS.mountainAt(a)}山 · ${tri}卦 · ${FS.DIR[tri]}</span></div>
+      <div class="cr-tags">${y ? `<em class="${y.good ? "good" : ""}">本命${y.k}位 · ${y.good ? "吉" : "凶"}</em>` : `<em>${Y.TRIGRAMS[tri].nature} · ${Y.TRIGRAMS[tri].trait}</em>`}<em>今日${st.n} · ${st.k}</em></div>${guide}`;
+  }
+
+  function dialLoop() {
+    if (S.screen !== "fs") { CMP.raf = 0; return; }
+    const d = n180(CMP.h - CMP.shown);
+    if (Math.abs(d) > 0.05) { CMP.shown = FS.norm(CMP.shown + d * (drag ? 1 : 0.18)); $("#cmpDial").style.transform = `rotate(${-CMP.shown}deg)`; }
+    const deg = Math.round(CMP.shown);
+    if (deg !== CMP.lastDeg || CMP.dirty) { CMP.lastDeg = deg; CMP.dirty = false; updateRead(); }
+    CMP.raf = requestAnimationFrame(dialLoop);
+  }
+
+  async function startCompass() {
+    try {
+      if (typeof DeviceOrientationEvent.requestPermission === "function" && (await DeviceOrientationEvent.requestPermission()) !== "granted") { toast("未获得方向权限"); return; }
+    } catch (e) { toast("当前浏览器不支持罗盘"); return; }
+    if (!CMP.listening) {
+      CMP.listening = true;
+      const onOri = (e) => {
+        let h = null;
+        if (typeof e.webkitCompassHeading === "number" && e.webkitCompassHeading >= 0) h = e.webkitCompassHeading;
+        else if ((e.absolute || e.type === "deviceorientationabsolute") && e.alpha != null) h = 360 - e.alpha;
+        if (h == null) return;
+        const so = (screen.orientation && screen.orientation.angle) || window.orientation || 0;
+        CMP.h = FS.norm(h + so);
+        if (!CMP.sensor) { CMP.sensor = true; buildDial(); toast("罗盘已开启"); }
+      };
+      addEventListener("ondeviceorientationabsolute" in window ? "deviceorientationabsolute" : "deviceorientation", onOri);
+    }
+    setTimeout(() => { if (!CMP.sensor) toast("未检测到指南针，可拖动盘面旋转"); }, 2500);
+  }
+  $("#cmpStart").onclick = startCompass;
+
+  // 无指南针时拖动盘面
+  let drag = null;
+  const angAt = (e) => (Math.atan2(e.clientX - drag.cx, -(e.clientY - drag.cy)) * 180) / Math.PI;
+  $("#cmp").addEventListener("pointerdown", (e) => {
+    if (CMP.sensor) return;
+    const r = $("#cmp").getBoundingClientRect();
+    drag = { cx: r.left + r.width / 2, cy: r.top + r.height / 2 };
+    drag.a = angAt(e);
+    $("#cmp").setPointerCapture(e.pointerId);
+  });
+  $("#cmp").addEventListener("pointermove", (e) => {
+    if (!drag) return;
+    const a = angAt(e);
+    CMP.h = FS.norm(CMP.h - n180(a - drag.a)); drag.a = a;
+  });
+  const endDrag = () => { drag = null; };
+  $("#cmp").addEventListener("pointerup", endDrag);
+  $("#cmp").addEventListener("pointercancel", endDrag);
 
   // ———————————————— 启动 ————————————————
   renderHome(); renderAsk(); go("home");
