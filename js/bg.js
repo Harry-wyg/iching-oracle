@@ -87,7 +87,7 @@
     ctx.clearRect(0, 0, W, H);
 
     // 朱砂日
-    const sx = W * (W < 700 ? 0.78 : 0.8) - par * 10, sy = H * 0.2 + state.lift * 0.3, sr = Math.min(W, H) * (W < 700 ? 0.11 : 0.085);
+    const sx = W * (W < 700 ? 0.86 : 0.8) - par * 10, sy = H * (W < 700 ? 0.24 : 0.2) + state.lift * 0.3, sr = Math.min(W, H) * (W < 700 ? 0.07 : 0.085);
     const sg = ctx.createRadialGradient(sx, sy, sr * 0.2, sx, sy, sr * 2.6);
     sg.addColorStop(0, `rgba(214,82,60,${0.16 * state.sun})`); sg.addColorStop(1, "rgba(214,82,60,0)");
     ctx.fillStyle = sg; ctx.beginPath(); ctx.arc(sx, sy, sr * 2.6, 0, 7); ctx.fill();
@@ -141,7 +141,7 @@
     mode(m) {
       Object.assign(target, {
         home: { lift: 0, fade: 1, sun: 1 }, ask: { lift: 90, fade: 0.8, sun: 0.25 }, cast: { lift: 60, fade: 0.9, sun: 0.12 },
-        result: { lift: 200, fade: 0.55, sun: 0.15 }, fs: { lift: 140, fade: 0.65, sun: 0.35 },
+        result: { lift: 200, fade: 0.55, sun: 0.15 }, fs: { lift: 140, fade: 0.65, sun: 0.35 }, me: { lift: 160, fade: 0.6, sun: 0.3 },
       }[m] || {});
     },
     pulse(x = W / 2, y = H / 2, red) {

@@ -33,14 +33,13 @@
       <span class="seal-mini">易</span>
       <span class="brand-txt"><b>问易</b> · 一卦一镜</span>
     </button>
+    <nav class="topnav" aria-label="主导航">
+      <button data-nav="home">今日</button><button data-nav="ask">问卦</button><button data-nav="fs">方位</button><button data-atlas>图鉴</button><button data-nav="me">我的</button>
+    </nav>
     <nav class="steps" id="steps">
       <span data-step="ask">问</span><i></i><span data-step="cast">卦</span><i></i><span data-step="result">解</span>
     </nav>
-    <div class="tools">
-      <button class="icon-btn" data-fs="cmp" aria-label="罗盘方位"><b>盘</b><span>罗盘</span></button>
-      <button class="icon-btn" id="btnAtlas" aria-label="卦象图鉴"><b>鉴</b><span>图鉴</span></button>
-      <button class="icon-btn" id="btnHistory" aria-label="推演记录"><b>录</b><span>记录</span></button>
-    </div>
+    <span class="top-date" id="topDate"></span>
   </header>
 
   <main>
@@ -48,56 +47,45 @@
     <section class="screen" id="home">
       <div class="home">
         <div class="hero">
-          <div class="hero-art">
+          <div class="hero-copy">
+            <p class="kicker" id="todayLunar">今日</p>
+            <h1>心有所惑，<br class="m-br" />不妨<em>问一卦</em>。</h1>
+            <p class="lead">三枚铜钱，六次起落。它不预言命运，只帮你换个角度看清此刻。</p>
+            <div class="cta-row">
+              <button class="btn-red big" data-go="ask"><span>开始问卦</span></button>
+              <span class="or">或直接选：</span>
+              <div class="topics" id="topics"></div>
+            </div>
+          </div>
+          <div class="hero-art" aria-hidden="true">
             <div class="ink-char">易</div>
             <div class="vert">一卦一镜<br />照见当下</div>
             <span class="hero-seal">问易</span>
           </div>
-          <div class="hero-copy">
-            <p class="kicker" id="todayLunar">今日</p>
-            <h1>心有所惑，<br />不妨<em>问一卦</em>。</h1>
-            <p class="lead">三枚铜钱，六次起落，得一卦象。<br />它不预言命运，只帮你换个角度看清此刻。</p>
-            <div class="cta-row">
-              <button class="btn-red big" data-go="ask"><span>开始问卦</span></button>
-              <button class="btn-line" id="btnDailyTop">今日一卦</button>
+        </div>
+
+        <div class="dash">
+          <div class="box today-box">
+            <div class="tb-h"><h2>今日</h2><small>每日一签 · 次日更新</small></div>
+            <div class="tb-body">
+              <div class="today-card" id="todayCard" role="button" tabindex="0" aria-label="翻开今日签">
+                <div class="tc-face tc-front">
+                  <div class="tc-top"><span>今日签</span><em id="tcDate"></em></div>
+                  <div class="tc-mid"><div class="tc-ring"><b>启</b></div><p>翻开今日签</p></div>
+                </div>
+                <div class="tc-face tc-back" id="tcBack"></div>
+              </div>
+              <div class="tb-side" id="todaySide"></div>
             </div>
+            <div class="tb-more" id="todayMore"></div>
+          </div>
+          <div class="dash-side">
+            <button class="side-ming" id="sideMing" data-fs="ming"></button>
+            <button class="side-year" id="sideYear"></button>
           </div>
         </div>
 
-        <div class="today" id="today">
-          <div class="today-card" id="todayCard">
-            <div class="tc-face tc-front">
-              <div class="tc-top"><span>今日签</span><em id="tcDate"></em></div>
-              <div class="tc-mid"><div class="tc-ring"><b>启</b></div><p>轻触翻开<br />今日专属一卦</p></div>
-              <div class="tc-bot">每人每日一签 · 次日更新</div>
-            </div>
-            <div class="tc-face tc-back" id="tcBack"></div>
-          </div>
-          <div class="today-side">
-            <h3>今日一卦</h3>
-            <p>无需提问，系统为你起一卦，作为今日的心境提示。<br />同一天内结果固定，明天再来看看有什么不同。</p>
-            <div class="today-actions" id="todayActions"></div>
-          </div>
-        </div>
-
-        <div class="block">
-          <div class="block-h"><span class="dot-red"></span>方位 · 风水<small>后天八卦定八方，风水之本</small></div>
-          <div class="fs-home" id="fsHome"></div>
-        </div>
-
-        <div class="block">
-          <div class="block-h"><span class="dot-red"></span>想问什么</div>
-          <div class="topics" id="topics"></div>
-        </div>
-
-        <div class="block">
-          <div class="block-h"><span class="dot-red"></span>三步问卦</div>
-          <div class="how">
-            <div><b>壹</b><h4>默念一事</h4><p>心中只想一件事，问得越具体越清晰</p></div>
-            <div><b>贰</b><h4>摇卦成象</h4><p>掷铜钱六次，或以时间、数字起卦</p></div>
-            <div><b>叁</b><h4>解卦出签</h4><p>白话解读、宜忌，一键生成运势卡片</p></div>
-          </div>
-        </div>
+        <div class="recent" id="recent"></div>
         <footer class="foot">问易 · 以《周易》为镜的自我观照工具 · 内容仅供娱乐与参考，不构成任何决策建议</footer>
       </div>
     </section>
@@ -139,7 +127,10 @@
 
     <!-- ———————— 方位 · 风水 ———————— -->
     <section class="screen" id="fs">
-      <div class="fs">
+      <div class="fs" id="fsWrap" data-sec="cmp" data-right="star">
+        <div class="fs-seg" id="fsSeg">
+          <button data-sec="cmp">罗盘</button><button data-sec="star">九宫飞星</button><button data-sec="ming">本命卦</button>
+        </div>
         <div class="sheet fs-cmp" id="fsCmp">
           <div class="sheet-h"><span class="no">盘</span><div><h2>罗盘寻方</h2><p id="cmpTip">手机平放，顶端所指即为朝向</p></div></div>
           <div class="cmp" id="cmp">
@@ -154,11 +145,32 @@
         <div class="fs-side">
           <div class="box" id="mingBox"></div>
           <div class="box" id="starBox"></div>
-          <p class="disclaimer">方位内容依传统八宅法与紫白飞星推演，节气按通式推算（个别年份可能差一日）；<br/>属传统文化娱乐参考，不构成任何装修、置业或投资建议。</p>
         </div>
+        <p class="disclaimer fs-note">方位内容依传统八宅法与紫白飞星推演，节气按通式推算（个别年份可能差一日）；<br/>属传统文化娱乐参考，不构成任何装修、置业或投资建议。</p>
+      </div>
+    </section>
+
+    <!-- ———————— 我的 ———————— -->
+    <section class="screen" id="me">
+      <div class="me">
+        <div class="box" id="meMing"></div>
+        <div class="box">
+          <div class="box-h"><b>录</b>问卦记录<small>仅保存在本机</small></div>
+          <div id="historyList"></div>
+        </div>
+        <button class="me-link" data-atlas><b>鉴</b><span>六十四卦图鉴<small>横为上卦，纵为下卦</small></span><i>›</i></button>
+        <p class="disclaimer">问易 · 以《周易》为镜的自我观照工具<br/>内容仅供娱乐与参考，不构成任何决策建议</p>
       </div>
     </section>
   </main>
+
+  <!-- 手机底部导航 -->
+  <nav class="tabbar" aria-label="主导航">
+    <button data-nav="home"><b>今</b><span>今日</span></button>
+    <button data-nav="ask"><b>卦</b><span>问卦</span></button>
+    <button data-nav="fs"><b>盘</b><span>方位</span></button>
+    <button data-nav="me"><b>我</b><span>我的</span></button>
+  </nav>
 
   <!-- 揭晓动画 -->
   <div class="reveal-layer" id="reveal"></div>
@@ -190,14 +202,6 @@
     <div class="modal-box wide">
       <div class="modal-h"><div><h3>六十四卦图鉴</h3><p>横为上卦，纵为下卦 · 点击查看</p></div><button class="x" data-close>✕</button></div>
       <div class="atlas-grid" id="atlasGrid"></div>
-    </div>
-  </div>
-
-  <!-- 记录 -->
-  <div class="modal" id="history">
-    <div class="modal-box">
-      <div class="modal-h"><div><h3>问卦记录</h3><p>仅保存在本机</p></div><button class="x" data-close>✕</button></div>
-      <div id="historyList"></div>
     </div>
   </div>
 

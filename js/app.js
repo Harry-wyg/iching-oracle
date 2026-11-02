@@ -66,11 +66,18 @@
       const i = order.indexOf(s.dataset.step);
       s.classList.toggle("on", i === cur); s.classList.toggle("done", cur > i);
     });
+    const tab = { cast: "ask", result: "ask" }[screen] || screen;
+    $$("[data-nav]").forEach((b) => b.classList.toggle("on", b.dataset.nav === tab));
     $("#" + screen).scrollTop = 0;
+    if (screen === "home") renderRecent();
+    if (screen === "me") renderMe();
     if (screen === "fs" && !CMP.raf) CMP.raf = requestAnimationFrame(dialLoop);
   }
   document.addEventListener("click", (e) => {
     const g = e.target.closest("[data-go]"); if (g) go(g.dataset.go);
+    const t = e.target.closest("[data-nav]");
+    if (t) { if (t.dataset.nav === "fs") openFs(); else { if (t.dataset.nav === "ask") renderAsk(); go(t.dataset.nav); } }
+    if (e.target.closest("[data-atlas]")) openAtlas();
     const f = e.target.closest("[data-fs]"); if (f) { $$(".modal.open").forEach((o) => o.classList.remove("open")); openFs(f.dataset.fs); }
     const c = e.target.closest("[data-close]"); if (c) c.closest(".modal").classList.remove("open");
     if (e.target.classList.contains("modal")) e.target.classList.remove("open");
@@ -82,40 +89,58 @@
   });
 
   // ———————————————— 首页 ————————————————
+  const shortDate = (d = new Date()) => `${d.getMonth() + 1}月${d.getDate()}日`;
   function renderHome() {
-    $("#todayLunar").textContent = `今日 · ${dateText()} · ${lunarText()}`;
-    $("#tcDate").textContent = dateText().slice(5).replace(".", "月") + "日";
-    $("#topics").innerHTML = CATS.map((c) => `<button class="topic" data-topic="${c.k}"><b>${c.i}</b><span>${c.n}</span><small>${c.d}</small></button>`).join("");
-    $("#todayActions").innerHTML = `<button class="btn-red" id="flipToday"><span>翻开今日签</span></button>`;
-    $("#flipToday").onclick = flipToday;
+    $("#todayLunar").textContent = `${dateText()} · ${lunarText()} · ${FS.dayChart(new Date()).title}`;
+    $("#topDate").textContent = `${shortDate()} · ${lunarText().split(" ")[1] || ""}`;
+    $("#tcDate").textContent = shortDate();
+    $("#topics").innerHTML = CATS.map((c) => `<button class="topic" data-topic="${c.k}">${c.n}</button>`).join("");
+    renderTodaySide(false);
     renderFsHome();
+    renderRecent();
   }
   $("#topics").addEventListener("click", (e) => {
     const b = e.target.closest("[data-topic]"); if (!b) return;
     S.cat = b.dataset.topic; renderAsk(); go("ask");
   });
   $("#todayCard").addEventListener("click", flipToday);
-  $("#btnDailyTop").onclick = () => {
-    $("#today").scrollIntoView({ behavior: "smooth", block: "center" });
-    setTimeout(flipToday, 500);
-  };
+  $("#todayCard").addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); flipToday(); } });
+
+  // 今日卡右侧：今日九宫 + 要位；翻签后加上卦吉方
+  function renderTodaySide(flipped) {
+    const day = FS.dayChart(new Date()), at = (s) => FS.DIR_SHORT[FS.palaceOf(day, s)];
+    const mini = FS.GRID.map((p) => `<i class="${starCls(day.map[p])} ${p === "中" ? "mid" : ""}">${day.map[p]}<small>${FS.DIR_SHORT[p]}</small></i>`).join("");
+    const dir = flipped && Y.lucky(Y.analyze(Y.dailyValues(userSeed))).direction;
+    $("#todaySide").innerHTML = `
+      <button class="tb-grid" data-fs="day" aria-label="查看今日九宫"><label>今日九宫 · ${FS.STARS[day.center].n}入中</label><span class="mini9">${mini}</span></button>
+      <p class="tb-keys"><span>文昌 ${at(4)}</span> · <span>旺气 ${at(9)}</span> · <span>五黄 ${at(5)}</span></p>
+      ${dir ? `<button class="tb-dir" id="dailyDir">卦吉方 <b>${dir}</b><small>罗盘寻方 ›</small></button>` : `<p class="tb-dir muted">卦吉方 · 翻签后揭晓</p>`}`;
+    if (dir) $("#dailyDir").onclick = () => openFs("cmp", { label: "今日卦吉方", dir, angle: FS.angleOfDir(dir) });
+  }
   function flipToday() {
     const card = $("#todayCard");
     if (card.classList.contains("flipped")) return;
     const r = Y.analyze(Y.dailyValues(userSeed)), sc = Y.score(r, "overall"), P = r.primary;
     $("#tcBack").innerHTML = `<span class="seal">${sc.level.slice(-1)}</span>
-      <div class="fn">今日 · 第 ${P.n} 卦</div>${hexa(P.bits, { moving: r.moving, size: "m", cls: "grow" })}
-      <div class="nm">${esc(nm(P))}</div><div class="fn">${esc(P.full)}</div><div class="gist">「${esc(P.gist || "")}」${LEVEL_TEXT[sc.level]}</div>`;
+      <div class="fn">第 ${P.n} 卦</div>${hexa(P.bits, { moving: r.moving, size: "m", cls: "grow" })}
+      <div class="nm">${esc(nm(P))}</div><div class="fn">${esc(P.full)}</div>`;
     card.classList.add("flipped");
     buzz(15);
     const rect = card.getBoundingClientRect(); BG.pulse(rect.left + rect.width / 2, rect.top + rect.height / 2, true);
-    const dir = Y.lucky(r).direction;
-    $("#todayActions").innerHTML = `<button class="btn-red" id="dailyDetail"><span>查看详解</span></button><button class="btn-line" id="dailyCard">生成今日卡片</button>
-      <button class="btn-line" id="dailyDir">今日吉方 · ${dir}</button>`;
+    renderTodaySide(true);
+    $("#todayMore").innerHTML = `<p class="gist">「${esc(P.gist || "")}」${LEVEL_TEXT[sc.level]}</p>
+      <div class="tb-btns"><button class="btn-red" id="dailyDetail"><span>查看详解</span></button><button class="btn-line" id="dailyCard">生成今日卡片</button></div>`;
     $("#dailyDetail").onclick = () => openDaily(false);
     $("#dailyCard").onclick = () => openDaily(true);
-    $("#dailyDir").onclick = () => openFs("cmp", { label: "今日卦吉方", dir, angle: FS.angleOfDir(dir) });
   }
+
+  // 最近问过：取记录前两条
+  function renderRecent() {
+    const list = store.get(HKEY, []).slice(0, 2);
+    $("#recent").innerHTML = list.length ? `<div class="recent-h"><h2>最近问过</h2><button class="link" data-nav="me">全部记录</button></div>
+      <div class="recent-list">${list.map((h, k) => histItem(h, k)).join("")}</div>` : "";
+  }
+  $("#recent").addEventListener("click", (e) => { const b = e.target.closest(".hist"); if (b) showResult(store.get(HKEY, [])[+b.dataset.k]); });
   function openDaily(card) {
     Object.assign(S, { question: "", cat: "overall", method: "daily", values: Y.dailyValues(userSeed), daily: true, time: Date.now() });
     showResult(null, true);
@@ -520,7 +545,7 @@
   };
 
   // ———————————————— 图鉴 / 详情 ————————————————
-  $("#btnAtlas").onclick = () => {
+  function openAtlas() {
     const cols = Y.XT_ORDER;
     let html = `<div></div>` + cols.map((u) => `<div class="ag-h">${hexa(Y.TRIGRAMS[u].bits, { size: "t" })}<span>${u}·${Y.TRIGRAMS[u].nature}</span></div>`).join("");
     for (const lo of cols) {
@@ -533,7 +558,7 @@
     }
     $("#atlasGrid").innerHTML = html;
     $("#atlas").classList.add("open");
-  };
+  }
   $("#atlasGrid").addEventListener("click", (e) => { const b = e.target.closest("[data-hex]"); if (b) openDetail(+b.dataset.hex); });
 
   function openDetail(n) {
@@ -562,22 +587,28 @@
     list.unshift({ t: S.time, q: S.question, cat: S.cat, method: S.method, values: S.values.slice() });
     store.set(HKEY, list.slice(0, 60));
   }
-  $("#btnHistory").onclick = () => {
+  function histItem(h, k) {
+    const r = Y.analyze(h.values), sc = Y.score(r, h.cat), c = catOf(h.cat);
+    return `<button class="hist" data-k="${k}">${hexa(r.lines, { size: "s", moving: r.moving })}
+      <div><b>${esc(r.primary.full)}${r.changed ? ` → ${esc(r.changed.full)}` : ""}</b>
+      <p>${h.method === "daily" ? "今日一卦" : `${c.n} · ${esc(h.q || "心中默念之事")}`}</p><small>${new Date(h.t).toLocaleString("zh-CN", { hour12: false })}</small></div>
+      <span class="seal">${sc.level.slice(-1)}</span></button>`;
+  }
+
+  // ———————————————— 我的 ————————————————
+  function renderMe() {
+    const m = mingOf();
+    $("#meMing").innerHTML = `<div class="box-h"><b>命</b>本命卦<small>八宅法 · 仅保存在本机</small></div>` + (m
+      ? `<button class="me-ming" data-fs="ming"><span class="ming-sym">${Y.TRIGRAMS[m.tri].sym}</span>
+          <span><b>${m.tri}命 · ${m.group}</b><small>${FS.bazhai(m.tri).filter((x) => x.good && x.k !== "伏位").map((x) => `${x.k} ${x.dir}`).join(" · ")}</small></span><i>›</i></button>`
+      : `<button class="me-ming" data-fs="ming"><span class="ming-sym txt">命</span><span><b>还没设置生日</b><small>填一次，所有方位都会结合你的命卦</small></span><i>›</i></button>`);
     const list = store.get(HKEY, []);
-    $("#historyList").innerHTML = list.length ? list.map((h, k) => {
-      const r = Y.analyze(h.values), sc = Y.score(r, h.cat), c = catOf(h.cat);
-      return `<button class="hist" data-k="${k}">${hexa(r.lines, { size: "s", moving: r.moving })}
-        <div><b>${esc(r.primary.full)}${r.changed ? ` → ${esc(r.changed.full)}` : ""}</b>
-        <p>${h.method === "daily" ? "今日一卦" : `${c.n} · ${esc(h.q || "心中默念之事")}`}</p><small>${new Date(h.t).toLocaleString("zh-CN", { hour12: false })}</small></div>
-        <span class="seal">${sc.level.slice(-1)}</span></button>`;
-    }).join("") + `<button class="btn-line clear" id="clearH">清空记录</button>` : `<p class="empty">还没有问卦记录</p>`;
-    $("#history").classList.add("open");
+    $("#historyList").innerHTML = list.length ? list.map(histItem).join("") + `<button class="btn-line clear" id="clearH">清空记录</button>` : `<p class="empty">还没有问卦记录</p>`;
     const cl = $("#clearH");
-    if (cl) cl.onclick = () => { store.set(HKEY, []); $("#history").classList.remove("open"); toast("已清空"); };
-  };
+    if (cl) cl.onclick = () => { store.set(HKEY, []); renderMe(); toast("已清空"); };
+  }
   $("#historyList").addEventListener("click", (e) => {
     const b = e.target.closest(".hist"); if (!b) return;
-    $("#history").classList.remove("open");
     showResult(store.get(HKEY, [])[+b.dataset.k]);
   });
 
@@ -606,34 +637,31 @@
   }
 
   function renderFsHome() {
-    const m = mingOf(), day = FS.dayChart(new Date()), tab = bannerTab(), yc = fsCharts()[tab].ch;
-    const at = (ch, s) => FS.DIR_SHORT[FS.palaceOf(ch, s)];
-    const mini = FS.GRID.map((p) => `<i class="${starCls(day.map[p])}">${day.map[p]}</i>`).join("");
+    const m = mingOf(), tab = bannerTab(), yc = fsCharts()[tab].ch;
     const good = m && FS.bazhai(m.tri).filter((x) => x.good && x.k !== "伏位");
-    $("#fsHome").innerHTML = `
-      <div class="fh-row">
-        <button class="fh-card" data-fs="ming">${m
-          ? `<span class="fh-sym">${Y.TRIGRAMS[m.tri].sym}</span><b>${m.tri}命 · ${m.group}</b><small>${good.map((x) => `${x.k} ${x.dir}`).join(" · ")}</small>`
-          : `<span class="fh-sym txt">命</span><b>测我的本命卦</b><small>八宅命卦 · 找到你的四个吉方</small>`}</button>
-        <button class="fh-card" data-fs="star"><span class="fh-grid">${mini}</span><b>今日九宫</b><small>九紫在${at(day, 9)} · 五黄在${at(day, 5)}</small></button>
-        <button class="fh-card" data-fs="cmp"><span class="fh-cmp"><i></i></span><b>手机罗盘</b><small>二十四山 · 一转寻吉方</small></button>
-      </div>
-      <button class="fh-year" data-fs="${tab}">
-        <span class="fy-n">${yc.y}</span>
-        <div><b>${Y.ganzhi(yc.y)}流年 · ${yc.label}</b><small>文昌在${at(yc, 4)}、正财在${at(yc, 8)}、五黄在${at(yc, 5)} · ${m ? "看你的专属流年方位" : "测测你的流年方位"}</small></div>
-        <em>查看</em>
-      </button>`;
+    $("#sideMing").innerHTML = m
+      ? `<label>本命卦</label><b>${Y.TRIGRAMS[m.tri].sym} ${m.tri}命 · ${m.group}</b><small>${good.map((x) => `${x.k} ${x.dir}`).join(" · ")}</small>`
+      : `<label>本命卦</label><b>设置生日，看你的本命吉方</b><small>填一次，所有方位都会结合你的命卦 ›</small>`;
+    $("#sideYear").dataset.fs = tab;
+    $("#sideYear").innerHTML = `<span class="fy-n">${yc.y}</span><b>${Y.ganzhi(yc.y)}流年 · ${yc.label}</b><small>看流年方位，生成专属海报 ›</small>`;
   }
 
   // sec: cmp / ming / star / day / month / y0 / y1；target: { label, dir, angle }
-  let fsTab = "day", mingEdit = false;
+  let fsTab = "day", fsSec = "cmp", mingEdit = false;
+  const wide = () => matchMedia("(min-width: 760px)").matches;
+  function setSec(sec) {
+    fsSec = sec;
+    const right = sec === "ming" ? "ming" : "star", w = $("#fsWrap");
+    w.dataset.sec = sec; w.dataset.right = right;
+    $$("#fsSeg button").forEach((b) => b.classList.toggle("on", b.dataset.sec === (wide() && sec === "cmp" ? right : sec)));
+  }
+  $("#fsSeg").onclick = (e) => { const b = e.target.closest("[data-sec]"); if (b) { setSec(b.dataset.sec); $("#fs").scrollTop = 0; } };
   function openFs(sec, target) {
     if (target) { CMP.extra = target; CMP.target = target; }
-    if (["day", "month", "y0", "y1"].includes(sec)) fsTab = sec;
+    if (["day", "month", "y0", "y1"].includes(sec)) { fsTab = sec; sec = "star"; }
     if (sec === "ming" && !mingOf()) mingEdit = true;
     renderFs(); go("fs");
-    const el = { cmp: "#fsCmp", ming: "#mingBox" }[sec] || (sec ? "#starBox" : null);
-    if (el && !(sec === "cmp" && matchMedia("(min-width: 760px)").matches)) setTimeout(() => $(el).scrollIntoView({ behavior: "smooth", block: "start" }), 380);
+    setSec(sec || fsSec);
   }
   function renderFs() { buildDial(); renderTargets(); renderMing(); renderStars(); CMP.dirty = true; }
 

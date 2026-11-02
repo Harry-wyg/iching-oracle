@@ -13,7 +13,8 @@ For local preview, serve it over HTTP: `python3 -m http.server 8765`, then open 
 
 ## 产品功能
 
-- **首页**: ink-wash hero, plus a "今日一卦" flip card (fixed per user per day, a daily-return hook) and six topic entry points
+- **导航**: four tabs — 今日 / 问卦 / 方位 / 我的 (a bottom tab bar on phones, top nav on PC; hidden during 起卦/解卦)
+- **今日（首页）**: one "开始问卦" CTA with topic chips, a 今日 card (flip-to-reveal daily hexagram, fixed per user per day, alongside today's 九宫 and the hexagram's lucky direction), 本命卦 and 流年 entries, and recent readings
 - **问事**: category chips, suggested questions per category, three casting methods
 - **起卦**:
   - 铜钱摇卦: 3D coin flips; shake the phone on mobile (iOS asks for motion permission), Space on desktop, vibration feedback
@@ -29,7 +30,7 @@ For local preview, serve it over HTTP: `python3 -m http.server 8765`, then open 
   - Hexagram link-up: the 吉方位 on the reading opens the compass; the reading says whether that direction matches the user's 命卦
   - 方位卡片: a 九宫 poster that reuses the three card themes
   - Home: a 方位 entry block, plus a next-year 流年 banner from October onward
-- **图鉴 / 记录**: 8×8 hexagram grid with detail views; history stored locally
+- **我的**: 本命卦 summary, full reading history (stored locally) and the 8×8 hexagram 图鉴; the 方位 page splits into 罗盘 / 九宫飞星 / 本命卦 segments on phones
 
 ## 结构
 
